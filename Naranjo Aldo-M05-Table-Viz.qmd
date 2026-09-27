@@ -271,4 +271,4 @@ AO3 is being revised because course level grade data isn't available to our team
 # Appendix {#sec-appendix}
 
 - GitHub repository: <https://github.com/naran115/M05-Table-Viz-CEP>
-- Published report on GitHub Pages: <https://naran115.github.io/M05-Table-Viz-CEP/Naranjo,%20Aldo-M05-Table-Viz.html>
+- Published report on GitHub Pages: <https://naran115.github.io/M05-Table-Viz-CEP/Naranjo%20Aldo-M05-Table-Viz.html>
