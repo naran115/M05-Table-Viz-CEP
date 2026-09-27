@@ -1,0 +1,274 @@
+---
+title: "M05-Visualizing Data with Tables for MSDM CEP"
+author: "Aldo Naranjo"
+date: '`r format(Sys.time())`'
+format:
+  html:
+    toc: true
+    toc-depth: 4
+    toc-expand: 1
+    toc-location: right-body
+    toc-title: "Contents"
+    number-sections: true
+    code-link: true
+    code-fold: show
+    code-overflow: wrap
+    code-tools: true
+    theme: cosmo
+    highlight-style: github
+    df-print: paged
+    embed-resources: true
+editor: visual
+execute:
+  freeze: auto
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| code-summary: "Setup: load packages"
+
+library(tidyverse)
+library(gt)
+library(gtExtras)
+```
+
+# Overview {#sec-overview}
+
+This report reflects on what I learned about building tables in R with the **gt** and **gtExtras** packages, then puts those skills to work on a presentation ready table. The essay responses are in @sec-essay, the table is in @sec-table, and the case for using it in my CEP work is in @sec-why.
+
+::: {.callout-note}
+## A note on the data
+
+This assignment asks for data from my MSDM CEP project. I don't have the CEP data yet. My project is with the Collins College of Hospitality Management at Cal Poly Pomona, and my Analytics Objective (AO3) looks at which courses are linked to student retention. The college hasn't shared its enrollment and retention data with our team so far, so I used the `pizzaplace` dataset that comes with the gt package, as the instructions allow. I set up the table so the same layout carries over once the real data arrives (see @sec-why).
+:::
+
+# Essay {#sec-essay}
+
+## What I Learned From the Videos
+
+> *Summarize what you learned from the videos you watched.*
+
+The biggest takeaway for me was that a table is its own kind of visualization, not just a dump of numbers. The gt package treats a table as a set of parts: a header with a title and subtitle, a stub for row labels, column labels, spanners that group related columns, the body, and a footer for source notes and footnotes. Once I understood those parts, building a table felt a lot like building a ggplot. You start with the data and keep layering on pieces with the pipe.
+
+The videos also showed that most of the work happens before the data ever reaches `gt()`. Grouping and summarizing with dplyr decides what the table can say, and gt decides how clearly it says it. From there, functions like `fmt_currency()`, `fmt_number()`, and `fmt_percent()` clean up how values display without changing the data underneath. gtExtras then adds themes and small inline charts, like sparklines and bar plots, that sit right inside the cells.
+
+## What I Liked About gt and gtExtras
+
+> *What did you like about the gt and gtExtra packages demonstrated in the videos?*
+
+What I liked most about gt is how readable the code is. Each function name says what it does (`tab_header()`, `tab_spanner()`, `tab_source_note()`), so even months later I can look at a table's code and follow it top to bottom. Formatting also felt safe. I can format a revenue column as dollars with two decimals and know the underlying numbers stay untouched for any math I do later.
+
+gtExtras was the fun part. A theme like `gt_theme_538()` makes a table look finished in one line, and functions like `gt_plt_sparkline()` and `gt_plt_bar_pct()` let me put a trend or a share right next to the number it describes. Coming from a background in theater and film, I appreciate anything that tells a story at a glance, and a sparkline in a table does exactly that.
+
+## How Tables Complement Charts
+
+> *How do tables complement charts for data visualization?*
+
+Charts are great at showing shape: a trend going up, one group being bigger than another, an outlier sticking out. What they're not great at is precision. If someone in a meeting asks "what was the exact revenue for veggie pizzas?", a bar chart makes them squint at the axis, while a table just answers.
+
+The two work best together. A chart gets the audience to notice a pattern, and a table backs it up with exact figures they can quote or compare. gtExtras blurs the line in a useful way, since a sparkline inside a table row gives the precise number and the overall pattern in the same spot.
+
+## When I Would Choose a Table Over a Chart
+
+> *Under what circumstances would you prefer to use tables rather than charts to visualize data?*
+
+I'd lean on a table in a few situations:
+
+1. **When exact values matter.** Budgets, revenue, enrollment counts, and anything a stakeholder might repeat in a follow up email.
+2. **When I'm comparing several measures across the same groups.** A chart gets crowded with five metrics, but a table with spanners keeps them organized.
+3. **When the audience needs to look things up.** A table lets each person find the row that matters to them.
+4. **When the dataset is small.** Four or five categories rarely need a full chart, and a table says the same thing in less space.
+
+In my day job in paid search, this comes up constantly. Clients want to see the trend, but they also want the exact cost per lead for last month, and a well formatted table handles that better than any chart.
+
+# Table With gt and gtExtras {#sec-table}
+
+> *Use the data for your MSDM CEP. If you don't have data yet, use the "pizzaplace" dataset. Pick some variables relevant to your Analytics Objectives and share some descriptive statistics using gt and gtExtra functions together to show numbers and small charts in one table.*
+
+## Choosing Variables With AO3 in Mind
+
+My AO3 asks which courses students drop off at and which courses are linked to better retention. The closest parallel in `pizzaplace` is looking at **categories** of pizza and how well each one holds onto its sales volume over the year. So I grouped the data by pizza `type` (classic, chicken, supreme, veggie), which plays the role that course category (general education vs. major) will play in my real data.[^1] For each group I summarized volume, revenue, pricing, and the month by month trend.
+
+[^1]: The `pizzaplace` dataset holds a full year (2015) of sales from a fictional pizza shop, with one row per pizza sold. It includes the order ID, date, time, pizza name, size, type, and price.
+
+## Data Wrangling and Table
+
+::: {.panel-tabset}
+
+### Summary Table
+
+```{r}
+#| label: tbl-category
+#| tbl-cap: "Pizza sales by category, with monthly trends"
+
+# Step 1: monthly units per category, kept as a list for the sparkline
+monthly_trend <- pizzaplace |>
+  mutate(month = as.integer(format(as.Date(date), "%m"))) |>
+  count(type, month, name = "units") |>
+  arrange(type, month) |>
+  group_by(type) |>
+  summarise(
+    monthly_units = list(units),
+    change = (last(units) - first(units)) / first(units),
+    .groups = "drop"
+  )
+
+# Step 2: descriptive statistics per category
+category_summary <- pizzaplace |>
+  group_by(type) |>
+  summarise(
+    pizzas = n(),
+    orders = n_distinct(id),
+    revenue = sum(price),
+    avg_price = mean(price),
+    .groups = "drop"
+  ) |>
+  mutate(
+    rev_share = revenue / sum(revenue) * 100,
+    rev_share_bar = rev_share
+  ) |>
+  left_join(monthly_trend, by = "type") |>
+  mutate(type = str_to_title(type)) |>
+  arrange(desc(revenue)) |>
+  select(type, pizzas, orders, revenue, avg_price, rev_share, rev_share_bar, monthly_units, change)
+
+# Step 3: build the table
+category_summary |>
+  gt(rowname_col = "type") |>
+  gt_theme_538() |>
+  tab_header(
+    title = md("**Which Pizza Categories Carry the Business?**"),
+    subtitle = "Volume, revenue, and monthly trend by category, full year 2015"
+  ) |>
+  tab_stubhead(label = "Pizza Category") |>
+  cols_label(
+    pizzas = "Pizzas Sold",
+    orders = "Orders",
+    revenue = "Total",
+    avg_price = "Avg. Price",
+    rev_share = "Share of Total",
+    rev_share_bar = "Share Bar",
+    monthly_units = "Units by Month",
+    change = "Jan to Dec"
+  ) |>
+  tab_spanner(label = "Volume", columns = c(pizzas, orders)) |>
+  tab_spanner(label = "Revenue", columns = c(revenue, avg_price, rev_share, rev_share_bar)) |>
+  tab_spanner(label = "Trend", columns = c(monthly_units, change)) |>
+  fmt_number(columns = c(pizzas, orders), decimals = 0) |>
+  fmt_currency(columns = c(revenue, avg_price), currency = "USD", decimals = 2) |>
+  fmt_percent(columns = change, decimals = 2) |>
+  fmt_number(columns = rev_share, decimals = 2, pattern = "{x}%") |>
+  data_color(columns = revenue, palette = "Blues") |>
+  gt_plt_bar_pct(
+    column = rev_share_bar,
+    scaled = TRUE,
+    fill = "#2C7FB8",
+    background = "#E6EEF5"
+  ) |>
+  gt_plt_sparkline(
+    column = monthly_units,
+    type = "shaded",
+    same_limit = FALSE,
+    palette = c("#2C7FB8", "black", "#B2182B", "#1A9850", "lightgrey")
+  ) |>
+  tab_style(
+    style = cell_text(color = "#B2182B", weight = "bold"),
+    locations = cells_body(columns = change, rows = change < 0)
+  ) |>
+  tab_style(
+    style = cell_text(color = "#1A9850", weight = "bold"),
+    locations = cells_body(columns = change, rows = change >= 0)
+  ) |>
+  cols_align(align = "center", columns = c(monthly_units, change)) |>
+  cols_width(rev_share_bar ~ px(100), monthly_units ~ px(120)) |>
+  tab_footnote(
+    footnote = "Unique order IDs. One order can include pizzas from more than one category.",
+    locations = cells_column_labels(columns = orders)
+  ) |>
+  tab_footnote(
+    footnote = "Average price per pizza sold, across all sizes.",
+    locations = cells_column_labels(columns = avg_price)
+  ) |>
+  tab_footnote(
+    footnote = "Percent change in pizzas sold from January to December.",
+    locations = cells_column_labels(columns = change)
+  ) |>
+  tab_source_note(
+    source_note = md("Source: `pizzaplace` dataset from the **gt** R package. Stand in data used until CCHM enrollment and retention data is available.")
+  )
+```
+
+### Wrangled Data
+
+```{r}
+#| label: tbl-wrangled
+#| tbl-cap: "The summarized data behind the table, before gt formatting"
+
+category_summary |>
+  select(-monthly_units, -rev_share_bar) |>
+  gt() |>
+  fmt_number(columns = where(is.numeric), decimals = 2) |>
+  tab_header(title = "Summary Data Before Formatting")
+```
+
+### Raw Data Preview
+
+```{r}
+#| label: tbl-raw
+#| tbl-cap: "First ten rows of the pizzaplace dataset"
+
+pizzaplace |>
+  slice_head(n = 10) |>
+  gt() |>
+  fmt_currency(columns = price, currency = "USD", decimals = 2) |>
+  tab_header(
+    title = "pizzaplace: Raw Data",
+    subtitle = "One row per pizza sold"
+  ) |>
+  opt_row_striping()
+```
+
+:::
+
+## Reading the Table
+
+@tbl-category shows that classic pizzas lead in pizzas sold, while the higher priced categories hold their own on revenue share. The sparklines show each category's rhythm across the year, and the Jan to Dec column gives a quick answer to whether a category held onto its volume by the end of the year. Every category sold a bit less in December than in January, and Supreme dipped the most. In a retention context, that's the kind of row I'd want to flag and dig into.
+
+::: {.callout-tip}
+## Functions used in this table
+
+From **gt**: `tab_header()`, `tab_stubhead()`, `cols_label()`, `tab_spanner()`, `fmt_number()`, `fmt_currency()`, `fmt_percent()`, `data_color()`, `tab_style()`, `cols_align()`, `tab_footnote()`, `tab_source_note()`, `opt_row_striping()`
+
+From **gtExtras**: `gt_theme_538()`, `gt_plt_bar_pct()`, `gt_plt_sparkline()`
+:::
+
+# Why This Table Belongs in My CEP Report {#sec-why}
+
+> *Explain why the table is worth adding to your MSDM project written report or presentation slides.*
+
+The pizza numbers themselves won't go in my CEP report, but the structure of @tbl-category is exactly what I want for AO3 once the college shares its data. Each piece has a direct match:
+
+| In this table | In my AO3 table |
+|:---|:---|
+| Pizza category (row) | Course category (general education vs. major) or specific course |
+| Pizzas sold and orders | Students enrolled and sections offered |
+| Revenue and share of total | Units taken and share of total units |
+| Monthly sparkline | Enrollment trend by term |
+| Jan to Dec change | Retention from one term or year to the next |
+
+: How the pizzaplace table maps to AO3 {#tbl-mapping}
+
+This is worth putting in front of Dr. Kwok and the CCHM team because it answers several questions in one glance: which course categories carry the most students, how their enrollment moves over time, and where students seem to fall off. A chart could show one of those things well, but a table with spanners and inline sparklines shows all of them together with exact numbers the college can act on. It's also compact enough for a single slide, which matters when we present to faculty who have limited time.
+
+::: {.callout-important}
+## Next step
+
+AO3 is being revised because course level grade data isn't available to our team. Once the revised objective and the data are settled, I'll swap `pizzaplace` for the CCHM data and keep the same table layout.
+:::
+
+# Appendix {#sec-appendix}
+
+- GitHub repository: <https://github.com/naran115/M05-Table-Viz-CEP>
+- Published report on GitHub Pages: <https://naran115.github.io/M05-Table-Viz-CEP/Naranjo,%20Aldo-M05-Table-Viz.html>
